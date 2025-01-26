@@ -1,27 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/house.dart';
 import '../models/event.dart';
+import 'device_service.dart';
 
 class FirebaseService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
   // Ev oluşturma
   Future<String> createHouse(String name) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Kullanıcı oturum açmamış');
-
+    final deviceId = await DeviceService.getDeviceId();
     final String inviteCode = _uuid.v4().substring(0, 6).toUpperCase();
     
     final house = House(
       id: _uuid.v4(),
       name: name,
-      ownerId: user.uid,
+      ownerId: deviceId,
       inviteCode: inviteCode,
-      memberIds: [user.uid],
+      memberIds: [deviceId],
     );
 
     await _firestore.collection('houses').doc(house.id).set({
@@ -37,8 +34,7 @@ class FirebaseService {
 
   // Eve katılma
   Future<void> joinHouse(String inviteCode) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Kullanıcı oturum açmamış');
+    final deviceId = await DeviceService.getDeviceId();
 
     final querySnapshot = await _firestore
         .collection('houses')
@@ -52,19 +48,17 @@ class FirebaseService {
     final houseDoc = querySnapshot.docs.first;
     final List<dynamic> memberIds = houseDoc.get('memberIds');
 
-    if (memberIds.contains(user.uid)) {
+    if (memberIds.contains(deviceId)) {
       throw Exception('Zaten bu eve üyesiniz');
     }
 
-    memberIds.add(user.uid);
+    memberIds.add(deviceId);
     await houseDoc.reference.update({'memberIds': memberIds});
   }
 
   // Etkinlik oluşturma
   Future<String> createEvent(String title, String description, DateTime date, String houseId) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Kullanıcı oturum açmamış');
-
+    final deviceId = await DeviceService.getDeviceId();
     final String inviteCode = _uuid.v4().substring(0, 6).toUpperCase();
     
     final event = Event(
@@ -72,10 +66,10 @@ class FirebaseService {
       title: title,
       description: description,
       houseId: houseId,
-      creatorId: user.uid,
+      creatorId: deviceId,
       inviteCode: inviteCode,
       date: date,
-      participantIds: [user.uid],
+      participantIds: [deviceId],
     );
 
     await _firestore.collection('events').doc(event.id).set({
@@ -94,8 +88,7 @@ class FirebaseService {
 
   // Etkinliğe katılma
   Future<void> joinEvent(String inviteCode) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Kullanıcı oturum açmamış');
+    final deviceId = await DeviceService.getDeviceId();
 
     final querySnapshot = await _firestore
         .collection('events')
@@ -109,11 +102,29 @@ class FirebaseService {
     final eventDoc = querySnapshot.docs.first;
     final List<dynamic> participantIds = eventDoc.get('participantIds');
 
-    if (participantIds.contains(user.uid)) {
+    if (participantIds.contains(deviceId)) {
       throw Exception('Zaten bu etkinliğe katıldınız');
     }
 
-    participantIds.add(user.uid);
+    participantIds.add(deviceId);
     await eventDoc.reference.update({'participantIds': participantIds});
+  }
+
+  // Kullanıcının evlerini getir
+  Future<List<House>> getUserHouses() async {
+    final deviceId = await DeviceService.getDeviceId();
+    
+    final querySnapshot = await _firestore
+        .collection('houses')
+        .where('memberIds', arrayContains: deviceId)
+        .get();
+
+    return querySnapshot.docs.map((doc) => House(
+      id: doc['id'],
+      name: doc['name'],
+      ownerId: doc['ownerId'],
+      inviteCode: doc['inviteCode'],
+      memberIds: List<String>.from(doc['memberIds']),
+    )).toList();
   }
 } 
