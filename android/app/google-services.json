@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "461574666060",
+    "project_id": "homeeco-fb485",
+    "storage_bucket": "homeeco-fb485.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:461574666060:android:3cfba35e944a44d11c81e9",
+        "android_client_info": {
+          "package_name": "com.example.home_eco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4kxYD9C1XeMSznCtSkVoO4L_iYzSSMJw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/firebase_service.dart';
 
 class CreateHouseScreen extends StatefulWidget {
   const CreateHouseScreen({super.key});
@@ -38,10 +39,38 @@ class _CreateHouseScreenState extends State<CreateHouseScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // TODO: Ev oluşturma işlemi
-                    // Oluşturulduktan sonra davet kodu gösterilecek
+                    try {
+                      final firebaseService = FirebaseService();
+                      final inviteCode = await firebaseService.createHouse(_nameController.text);
+                      
+                      // Başarılı olduğunda davet kodunu göster
+                      if (mounted) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Ev Oluşturuldu'),
+                            content: Text('Davet Kodu: $inviteCode'),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('Tamam'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Hata: ${e.toString()}')),
+                        );
+                      }
+                    }
                   }
                 },
                 child: const Text('Ev Oluştur'),

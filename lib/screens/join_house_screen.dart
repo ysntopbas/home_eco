@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/firebase_service.dart';
 
 class JoinHouseScreen extends StatefulWidget {
   const JoinHouseScreen({super.key});
@@ -38,9 +39,25 @@ class _JoinHouseScreenState extends State<JoinHouseScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // TODO: Eve katılma işlemi
+                    try {
+                      final firebaseService = FirebaseService();
+                      await firebaseService.joinHouse(_codeController.text);
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Eve başarıyla katıldınız')),
+                        );
+                        Navigator.of(context).pop();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Hata: ${e.toString()}')),
+                        );
+                      }
+                    }
                   }
                 },
                 child: const Text('Katıl'),
