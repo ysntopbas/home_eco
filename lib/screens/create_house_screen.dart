@@ -43,26 +43,10 @@ class _CreateHouseScreenState extends State<CreateHouseScreen> {
                   if (_formKey.currentState!.validate()) {
                     try {
                       final firebaseService = FirebaseService();
-                      final inviteCode = await firebaseService.createHouse(_nameController.text);
+                      await firebaseService.createHouse(_nameController.text);
                       
-                      // Başarılı olduğunda davet kodunu göster
                       if (mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Ev Oluşturuldu'),
-                            content: Text('Davet Kodu: $inviteCode'),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  Navigator.of(context).pop();
-                                },
-                                child: const Text('Tamam'),
-                              ),
-                            ],
-                          ),
-                        );
+                        Navigator.of(context).pop();
                       }
                     } catch (e) {
                       if (mounted) {

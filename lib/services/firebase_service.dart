@@ -127,4 +127,8 @@ class FirebaseService {
       memberIds: List<String>.from(doc['memberIds']),
     )).toList();
   }
+
+  Future<void> deleteHouse(String houseId) async {
+    await _firestore.collection('houses').doc(houseId).delete();
+  }
 } 
