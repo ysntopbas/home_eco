@@ -165,7 +165,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     GridView.count(
                       shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
                       crossAxisCount: 2,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
@@ -173,30 +172,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         HomeCard(
                           title: 'Ev Oluştur',
                           icon: Icons.home_outlined,
-                          onTap: _ownedHouses.isEmpty
-                              ? () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const CreateHouseScreen(),
-                                    ),
-                                  );
-                                  _loadHouses();
-                                }
-                              : null,
+                          onTap: _ownedHouses.isNotEmpty ? null : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CreateHouseScreen(),
+                              ),
+                            ).then((_) => _loadHouses());
+                          },
                           isDisabled: _ownedHouses.isNotEmpty,
                         ),
                         HomeCard(
                           title: 'Eve Katıl',
                           icon: Icons.group_add,
-                          onTap: () {
+                          onTap: _ownedHouses.isNotEmpty ? null : () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const JoinHouseScreen(),
                               ),
-                            );
+                            ).then((_) => _loadHouses());
                           },
+                          isDisabled: _ownedHouses.isNotEmpty,
                         ),
                         HomeCard(
                           title: 'Etkinlik Oluştur',
@@ -229,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Text(
                         'Sahibi Olduğum Evler',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -247,12 +244,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.share),
-                                    onPressed: () => _showInviteCode(house.inviteCode),
+                                    icon: const Icon(Icons.people),
+                                    onPressed: () => _showHouseMembers(house),
+                                    tooltip: 'Ev Üyeleri',
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.grey),
+                                    icon: const Icon(Icons.share),
+                                    onPressed: () => _showInviteCode(house.inviteCode),
+                                    tooltip: 'Davet Kodu',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
                                     onPressed: () => _confirmDelete(house),
+                                    tooltip: 'Evi Sil',
                                   ),
                                 ],
                               ),
@@ -266,6 +270,50 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
     );
+  }
+
+  void _showHouseMembers(House house) async {
+    try {
+      final members = await _firebaseService.getHouseMembers(house.id);
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('${house.name} Üyeleri'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: members.map((member) => 
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '• ${member.name}',
+                    style: TextStyle(
+                      fontWeight: member.id == house.ownerId 
+                          ? FontWeight.bold 
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kapat'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Üyeler yüklenirken hata oluştu: $e')),
+      );
+    }
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/house.dart';
 import '../models/event.dart';
+import '../models/house_member.dart';
 import 'device_service.dart';
 
 class FirebaseService {
@@ -33,7 +34,7 @@ class FirebaseService {
   }
 
   // Eve katılma
-  Future<void> joinHouse(String inviteCode) async {
+  Future<void> joinHouse(String inviteCode, String memberName) async {
     final userId = await DeviceService.getUserId();
 
     final querySnapshot = await _firestore
@@ -51,6 +52,12 @@ class FirebaseService {
     if (memberIds.contains(userId)) {
       throw Exception('Zaten bu eve üyesiniz');
     }
+
+    // Üye bilgilerini kaydet
+    await _firestore.collection('users').doc(userId).set({
+      'id': userId,
+      'name': memberName,
+    });
 
     memberIds.add(userId);
     await houseDoc.reference.update({'memberIds': memberIds});
@@ -145,5 +152,32 @@ class FirebaseService {
     } catch (e) {
       throw Exception('Ev silinirken bir hata oluştu: $e');
     }
+  }
+
+  Future<List<HouseMember>> getHouseMembers(String houseId) async {
+    final house = await _firestore.collection('houses').doc(houseId).get();
+    if (!house.exists) {
+      throw Exception('Ev bulunamadı');
+    }
+
+    final List<dynamic> memberIds = house.get('memberIds') as List<dynamic>;
+    
+    final members = await Future.wait(
+      memberIds.map((memberId) async {
+        final userDoc = await _firestore.collection('users').doc(memberId).get();
+        if (!userDoc.exists) {
+          return HouseMember(
+            id: memberId,
+            name: 'Bilinmeyen Üye',
+          );
+        }
+        return HouseMember(
+          id: memberId as String,
+          name: userDoc.get('name') as String,
+        );
+      }),
+    );
+
+    return members;
   }
 }
