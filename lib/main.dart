@@ -55,10 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadHouses() async {
     setState(() => _isLoading = true);
     try {
-      final deviceId = await DeviceService.getDeviceId();
+      final userId = await DeviceService.getUserId();
       final houses = await _firebaseService.getUserHouses();
       setState(() {
-        _ownedHouses = houses.where((house) => house.ownerId == deviceId).toList();
+        _ownedHouses = houses.where((house) => house.ownerId == userId).toList();
       });
     } catch (e) {
       // Hata yönetimi
