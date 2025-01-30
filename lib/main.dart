@@ -45,6 +45,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   List<House> _ownedHouses = [];
+  List<House> _memberHouses = []; // Üye olunan evler için yeni liste
   List<Event> _events = [];
   bool _isLoading = true;
   String? _currentUserId; // Kullanıcı ID'sini saklayacak değişken
@@ -79,6 +80,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _ownedHouses =
             houses.where((house) => house.ownerId == userId).toList();
+        _memberHouses =
+            houses.where((house) => house.ownerId != userId).toList();
       });
     } catch (e) {
       // Hata yönetimi
@@ -461,6 +464,45 @@ class _HomeScreenState extends State<HomeScreen> {
                                             color: Colors.red),
                                         onPressed: () => _confirmDelete(house),
                                         tooltip: 'Evi Sil',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_memberHouses.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      ExpansionTile(
+                        leading: const Icon(Icons.home_work, size: 28),
+                        title: const Text(
+                          'Üyesi Olduğum Evler',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        children: [
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _memberHouses.length,
+                            itemBuilder: (context, index) {
+                              final house = _memberHouses[index];
+                              return Card(
+                                child: ListTile(
+                                  title: Text(house.name),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.people),
+                                        onPressed: () =>
+                                            _showHouseMembers(house),
+                                        tooltip: 'Ev Üyeleri',
                                       ),
                                     ],
                                   ),
