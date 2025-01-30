@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/firebase_service.dart';
 
 class JoinEventScreen extends StatefulWidget {
   const JoinEventScreen({super.key});
@@ -26,21 +27,33 @@ class _JoinEventScreenState extends State<JoinEventScreen> {
               TextFormField(
                 controller: _codeController,
                 decoration: const InputDecoration(
-                  labelText: 'Etkinlik Kodu',
-                  border: OutlineInputBorder(),
+                  labelText: 'Davet Kodu',
+                  hintText: 'Etkinlik davet kodunu girin',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Lütfen etkinlik kodunu giriniz';
+                    return 'Lütfen davet kodunu girin';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // TODO: Etkinliğe katılma işlemi
+                    try {
+                      final firebaseService = FirebaseService();
+                      await firebaseService.joinEvent(_codeController.text);
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    }
                   }
                 },
                 child: const Text('Katıl'),
@@ -51,4 +64,4 @@ class _JoinEventScreenState extends State<JoinEventScreen> {
       ),
     );
   }
-} 
+}

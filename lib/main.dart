@@ -45,15 +45,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   List<House> _ownedHouses = [];
-  List<House> _memberHouses = []; // Üye olunan evler için yeni liste
-  List<Event> _events = [];
+  List<House> _memberHouses = [];
+  List<Event> _createdEvents = [];
+  List<Event> _joinedEvents = [];
   bool _isLoading = true;
-  String? _currentUserId; // Kullanıcı ID'sini saklayacak değişken
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _initializeUserId(); // Kullanıcı ID'sini başlangıçta al
+    _initializeUserId();
   }
 
   Future<void> _initializeUserId() async {
@@ -75,13 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadHouses() async {
     try {
-      final userId = await DeviceService.getUserId();
       final houses = await _firebaseService.getUserHouses();
       setState(() {
         _ownedHouses =
-            houses.where((house) => house.ownerId == userId).toList();
+            houses.where((house) => house.ownerId == _currentUserId).toList();
         _memberHouses =
-            houses.where((house) => house.ownerId != userId).toList();
+            houses.where((house) => house.ownerId != _currentUserId).toList();
       });
     } catch (e) {
       // Hata yönetimi
@@ -93,7 +93,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final events = await _firebaseService.getUserEvents();
       if (mounted) {
         setState(() {
-          _events = events;
+          _createdEvents = events
+              .where((event) => event.creatorId == _currentUserId)
+              .toList();
+          _joinedEvents = events
+              .where((event) => event.creatorId != _currentUserId)
+              .toList();
         });
       }
     } catch (e) {
@@ -304,7 +309,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         HomeCard(
                           title: 'Ev Oluştur',
                           icon: Icons.home_outlined,
-                          onTap: _ownedHouses.isNotEmpty
+                          onTap: (_ownedHouses.isNotEmpty ||
+                                  _memberHouses.isNotEmpty)
                               ? null
                               : () {
                                   Navigator.push(
@@ -315,12 +321,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ).then((_) => _loadHouses());
                                 },
-                          isDisabled: _ownedHouses.isNotEmpty,
+                          isDisabled: _ownedHouses.isNotEmpty ||
+                              _memberHouses.isNotEmpty,
                         ),
                         HomeCard(
                           title: 'Eve Katıl',
                           icon: Icons.group_add,
-                          onTap: _ownedHouses.isNotEmpty
+                          onTap: (_ownedHouses.isNotEmpty ||
+                                  _memberHouses.isNotEmpty)
                               ? null
                               : () {
                                   Navigator.push(
@@ -331,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ).then((_) => _loadHouses());
                                 },
-                          isDisabled: _ownedHouses.isNotEmpty,
+                          isDisabled: _ownedHouses.isNotEmpty ||
+                              _memberHouses.isNotEmpty,
                         ),
                         HomeCard(
                           title: 'Etkinlik Oluştur',
@@ -359,12 +368,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    if (_events.isNotEmpty) ...[
+                    if (_createdEvents.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       ExpansionTile(
                         leading: const Icon(Icons.event, size: 28),
                         title: const Text(
-                          'Etkinliklerim',
+                          'Oluşturduğum Etkinlikler',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -374,9 +383,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _events.length,
+                            itemCount: _createdEvents.length,
                             itemBuilder: (context, index) {
-                              final event = _events[index];
+                              final event = _createdEvents[index];
                               final formattedDate =
                                   DateFormat('dd/MM/yyyy').format(event.date);
                               return Card(
@@ -405,16 +414,58 @@ class _HomeScreenState extends State<HomeScreen> {
                                             _showInviteCode(event.inviteCode),
                                         tooltip: 'Davet Kodu',
                                       ),
-                                      if (_currentUserId != null &&
-                                          event.creatorId == _currentUserId)
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () =>
-                                              _confirmDeleteEvent(event),
-                                          tooltip: 'Etkinliği Sil',
-                                        ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () =>
+                                            _confirmDeleteEvent(event),
+                                        tooltip: 'Etkinliği Sil',
+                                      ),
                                     ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_joinedEvents.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      ExpansionTile(
+                        leading: const Icon(Icons.event_note, size: 28),
+                        title: const Text(
+                          'Katıldığım Etkinlikler',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        children: [
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _joinedEvents.length,
+                            itemBuilder: (context, index) {
+                              final event = _joinedEvents[index];
+                              final formattedDate =
+                                  DateFormat('dd/MM/yyyy').format(event.date);
+                              return Card(
+                                child: ListTile(
+                                  title: Text(event.title),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Tarih: $formattedDate'),
+                                      Text('Oluşturan: ${event.creatorName}'),
+                                    ],
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.people),
+                                    onPressed: () =>
+                                        _showEventParticipants(event),
+                                    tooltip: 'Katılımcılar',
                                   ),
                                 ),
                               );
