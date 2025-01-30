@@ -11,6 +11,7 @@ class CreateHouseScreen extends StatefulWidget {
 class _CreateHouseScreenState extends State<CreateHouseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _ownerNameController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +25,20 @@ class _CreateHouseScreenState extends State<CreateHouseScreen> {
           key: _formKey,
           child: Column(
             children: [
+              TextFormField(
+                controller: _ownerNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Adınız',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Lütfen adınızı giriniz';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -43,8 +58,11 @@ class _CreateHouseScreenState extends State<CreateHouseScreen> {
                   if (_formKey.currentState!.validate()) {
                     try {
                       final firebaseService = FirebaseService();
-                      await firebaseService.createHouse(_nameController.text);
-                      
+                      await firebaseService.createHouse(
+                        _nameController.text,
+                        _ownerNameController.text,
+                      );
+
                       if (mounted) {
                         Navigator.of(context).pop();
                       }
@@ -65,4 +83,4 @@ class _CreateHouseScreenState extends State<CreateHouseScreen> {
       ),
     );
   }
-} 
+}

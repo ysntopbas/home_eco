@@ -4,16 +4,23 @@ import '../models/house.dart';
 import '../models/event.dart';
 import '../models/house_member.dart';
 import 'device_service.dart';
+import 'dart:math';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
   // Ev oluşturma
-  Future<String> createHouse(String name) async {
+  Future<String> createHouse(String name, String ownerName) async {
     final userId = await DeviceService.getUserId();
     final String inviteCode = _uuid.v4().substring(0, 6).toUpperCase();
-    
+
+    // Önce kullanıcı bilgilerini kaydet
+    await _firestore.collection('users').doc(userId).set({
+      'id': userId,
+      'name': ownerName,
+    });
+
     final house = House(
       id: _uuid.v4(),
       name: name,
@@ -63,39 +70,47 @@ class FirebaseService {
     await houseDoc.reference.update({'memberIds': memberIds});
   }
 
-  // Etkinlik oluşturma
-  Future<String> createEvent(String title, String description, DateTime date, String houseId) async {
-    final userId = await DeviceService.getUserId();
-    final String inviteCode = _uuid.v4().substring(0, 6).toUpperCase();
-    
-    final event = Event(
-      id: _uuid.v4(),
-      title: title,
-      description: description,
-      houseId: houseId,
-      creatorId: userId,
-      inviteCode: inviteCode,
-      date: date,
-      participantIds: [userId],
-    );
+  // Event işlemleri için yeni metodlar
+  Future<String> createEvent({
+    required String title,
+    required String description,
+    required String ownerName,
+    required DateTime date,
+  }) async {
+    try {
+      final String userId = await DeviceService.getUserId();
+      final String inviteCode = _generateInviteCode();
 
-    await _firestore.collection('events').doc(event.id).set({
-      'id': event.id,
-      'title': event.title,
-      'description': event.description,
-      'houseId': event.houseId,
-      'creatorId': event.creatorId,
-      'inviteCode': event.inviteCode,
-      'date': event.date.toIso8601String(),
-      'participantIds': event.participantIds,
-    });
+      final eventRef = _firestore.collection('events').doc();
 
-    return inviteCode;
+      final event = Event(
+        id: eventRef.id,
+        title: title,
+        description: description,
+        creatorId: userId,
+        creatorName: ownerName,
+        inviteCode: inviteCode,
+        date: date,
+        participantIds: [userId],
+      );
+
+      await eventRef.set(event.toMap());
+      return inviteCode;
+    } catch (e) {
+      throw 'Etkinlik oluşturulamadı: $e';
+    }
+  }
+
+  String _generateInviteCode() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    final random = Random();
+    return List.generate(6, (index) => chars[random.nextInt(chars.length)])
+        .join();
   }
 
   // Etkinliğe katılma
   Future<void> joinEvent(String inviteCode) async {
-    final userId = await DeviceService.getUserId();
+    final String userId = await DeviceService.getUserId();
 
     final querySnapshot = await _firestore
         .collection('events')
@@ -103,49 +118,52 @@ class FirebaseService {
         .get();
 
     if (querySnapshot.docs.isEmpty) {
-      throw Exception('Geçersiz etkinlik kodu');
+      throw 'Geçersiz etkinlik kodu';
     }
 
     final eventDoc = querySnapshot.docs.first;
-    final List<dynamic> participantIds = eventDoc.get('participantIds');
+    final event = Event.fromMap(eventDoc.data());
 
-    if (participantIds.contains(userId)) {
-      throw Exception('Zaten bu etkinliğe katıldınız');
+    if (event.participantIds.contains(userId)) {
+      throw 'Zaten bu etkinliğe katıldınız';
     }
 
-    participantIds.add(userId);
-    await eventDoc.reference.update({'participantIds': participantIds});
+    await eventDoc.reference.update({
+      'participantIds': [...event.participantIds, userId]
+    });
   }
 
   // Kullanıcının evlerini getir
   Future<List<House>> getUserHouses() async {
     final userId = await DeviceService.getUserId();
-    
+
     final querySnapshot = await _firestore
         .collection('houses')
         .where('memberIds', arrayContains: userId)
         .get();
 
-    return querySnapshot.docs.map((doc) => House(
-      id: doc['id'],
-      name: doc['name'],
-      ownerId: doc['ownerId'],
-      inviteCode: doc['inviteCode'],
-      memberIds: List<String>.from(doc['memberIds']),
-    )).toList();
+    return querySnapshot.docs
+        .map((doc) => House(
+              id: doc['id'],
+              name: doc['name'],
+              ownerId: doc['ownerId'],
+              inviteCode: doc['inviteCode'],
+              memberIds: List<String>.from(doc['memberIds']),
+            ))
+        .toList();
   }
 
   // Ev silme
   Future<void> deleteHouse(String houseId) async {
     try {
       await _firestore.collection('houses').doc(houseId).delete();
-      
+
       // İlgili eve ait etkinlikleri de silme
       final eventsSnapshot = await _firestore
           .collection('events')
           .where('houseId', isEqualTo: houseId)
           .get();
-      
+
       for (var doc in eventsSnapshot.docs) {
         await doc.reference.delete();
       }
@@ -161,10 +179,11 @@ class FirebaseService {
     }
 
     final List<dynamic> memberIds = house.get('memberIds') as List<dynamic>;
-    
+
     final members = await Future.wait(
       memberIds.map((memberId) async {
-        final userDoc = await _firestore.collection('users').doc(memberId).get();
+        final userDoc =
+            await _firestore.collection('users').doc(memberId).get();
         if (!userDoc.exists) {
           return HouseMember(
             id: memberId,
@@ -179,5 +198,68 @@ class FirebaseService {
     );
 
     return members;
+  }
+
+  // Kullanıcının etkinliklerini getir
+  Future<List<Event>> getUserEvents() async {
+    final String userId = await DeviceService.getUserId();
+
+    final querySnapshot = await _firestore
+        .collection('events')
+        .where('participantIds', arrayContains: userId)
+        .get();
+
+    return querySnapshot.docs.map((doc) => Event.fromMap(doc.data())).toList();
+  }
+
+  // Etkinlik silme (sadece oluşturan kişi silebilir)
+  Future<void> deleteEvent(String eventId) async {
+    try {
+      final String userId = await DeviceService.getUserId();
+
+      final eventDoc = await _firestore.collection('events').doc(eventId).get();
+
+      if (!eventDoc.exists) {
+        throw 'Etkinlik bulunamadı';
+      }
+
+      if (eventDoc.get('creatorId') != userId) {
+        throw 'Bu etkinliği silme yetkiniz yok';
+      }
+
+      await _firestore.collection('events').doc(eventId).delete();
+    } catch (e) {
+      throw 'Etkinlik silinemedi: $e';
+    }
+  }
+
+  // Etkinlik katılımcılarını getir
+  Future<List<HouseMember>> getEventParticipants(String eventId) async {
+    final eventDoc = await _firestore.collection('events').doc(eventId).get();
+
+    if (!eventDoc.exists) {
+      throw Exception('Etkinlik bulunamadı');
+    }
+
+    final List<dynamic> participantIds = eventDoc.get('participantIds');
+
+    final participants = await Future.wait(
+      participantIds.map((participantId) async {
+        final userDoc =
+            await _firestore.collection('users').doc(participantId).get();
+        if (!userDoc.exists) {
+          return HouseMember(
+            id: participantId,
+            name: 'Bilinmeyen Katılımcı',
+          );
+        }
+        return HouseMember(
+          id: participantId as String,
+          name: userDoc.get('name') as String,
+        );
+      }),
+    );
+
+    return participants;
   }
 }
