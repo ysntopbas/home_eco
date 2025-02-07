@@ -1,4 +1,4 @@
-package com.example.home_eco
+package com.example.billbuddy
 
 import io.flutter.embedding.android.FlutterActivity
 
