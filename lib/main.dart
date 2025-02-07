@@ -17,10 +17,19 @@ import 'screens/detail_page.dart';
 import 'models/payment_info.dart';
 import 'providers/theme_provider.dart'; // CustomColors sınıfı burada
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  // Ortam değişkenlerini yükleyin
+  await dotenv.load(fileName: ".env");
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
